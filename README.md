@@ -1,6 +1,6 @@
 # UniFi Node
 
-A comprehensive Node.js module for communicating and controlling Ubiquiti UniFi hardware through the UniFi Controller API.
+A comprehensive TypeScript/Node.js module for communicating and controlling Ubiquiti UniFi hardware through the UniFi Controller API. Built with full type safety and modern TypeScript features.
 
 ## Features
 
@@ -12,6 +12,9 @@ A comprehensive Node.js module for communicating and controlling Ubiquiti UniFi 
 - 🌐 Multi-site support
 - 📱 WebSocket support for real-time events
 - 🛡️ SSL/TLS support with certificate validation options
+- 🏷️ **Full TypeScript support with comprehensive type definitions**
+- 🔒 **Type-safe API with interfaces for all UniFi data structures**
+- ⚡ **Modern ES2020+ features with full IntelliSense support**
 
 ## Installation
 
@@ -21,8 +24,44 @@ npm install unifi-node
 
 ## Quick Start
 
+### TypeScript (Recommended)
+```typescript
+import { UniFiAPI, UniFiConfig } from 'unifi-node';
+
+const config: UniFiConfig = {
+  host: '192.168.1.1',
+  port: 8443,
+  username: 'admin',
+  password: 'your-password',
+  site: 'default'
+};
+
+async function main(): Promise<void> {
+  const unifi = new UniFiAPI(config);
+  
+  try {
+    await unifi.login();
+    
+    // Get all devices with full type safety
+    const devices = await unifi.getDevices();
+    console.log('Devices:', devices);
+    
+    // Get all clients with type information
+    const clients = await unifi.getClients();
+    console.log('Clients:', clients);
+    
+    await unifi.logout();
+  } catch (error) {
+    console.error('Error:', error);
+  }
+}
+
+main();
+```
+
+### JavaScript
 ```javascript
-const UniFiAPI = require('unifi-node');
+const { UniFiAPI } = require('unifi-node');
 
 const unifi = new UniFiAPI({
   host: '192.168.1.1',
@@ -47,6 +86,41 @@ async function main() {
     await unifi.logout();
   } catch (error) {
     console.error('Error:', error.message);
+  }
+}
+
+main();
+```
+
+### TypeScript
+```typescript
+import { UniFiAPI, UniFiConfig, UniFiDevice, UniFiClient } from 'unifi-node';
+
+const config: UniFiConfig = {
+  host: '192.168.1.1',
+  port: 8443,
+  username: 'admin',
+  password: 'your-password',
+  site: 'default'
+};
+
+async function main(): Promise<void> {
+  const unifi = new UniFiAPI(config);
+  
+  try {
+    await unifi.login();
+    
+    // Type-safe device operations
+    const devices: UniFiDevice[] = await unifi.getDevices();
+    const accessPoints = devices.filter(device => device.type === 'uap');
+    
+    // Type-safe client operations
+    const clients: UniFiClient[] = await unifi.getClients();
+    const wirelessClients = clients.filter(client => !client.is_wired);
+    
+    await unifi.logout();
+  } catch (error) {
+    console.error('Error:', (error as Error).message);
   }
 }
 
@@ -108,30 +182,114 @@ main();
 
 The module supports real-time events via WebSocket:
 
-```javascript
-unifi.on('client.connected', (client) => {
+```typescript
+import { UniFiAPI, UniFiClient } from 'unifi-node';
+
+unifi.on('client.connected', (client: UniFiClient) => {
   console.log('Client connected:', client.mac);
 });
 
-unifi.on('client.disconnected', (client) => {
+unifi.on('client.disconnected', (client: UniFiClient) => {
   console.log('Client disconnected:', client.mac);
 });
 
-unifi.on('device.state_change', (device) => {
+unifi.on('device.state_change', (device: any) => {
   console.log('Device state changed:', device.mac, device.state);
 });
 
 await unifi.enableEvents();
 ```
 
+## TypeScript Support
+
+This module is written in TypeScript and provides comprehensive type definitions for all UniFi data structures:
+
+### Core Types
+
+```typescript
+import { 
+  UniFiConfig,
+  UniFiDevice, 
+  UniFiClient, 
+  UniFiNetwork,
+  UniFiSite,
+  UniFiAlert,
+  UniFiSystemInfo 
+} from 'unifi-node';
+
+// Type-safe configuration
+const config: UniFiConfig = {
+  host: 'controller.local',
+  username: 'admin',
+  password: 'password'
+};
+
+// Type-safe device handling
+const handleDevices = (devices: UniFiDevice[]) => {
+  devices.forEach(device => {
+    console.log(`${device.name}: ${device.state === 1 ? 'Online' : 'Offline'}`);
+    
+    // TypeScript knows about optional properties
+    if (device.general_temperature) {
+      console.log(`Temperature: ${device.general_temperature}°C`);
+    }
+  });
+};
+
+// Type-safe client filtering
+const getWirelessClients = (clients: UniFiClient[]): UniFiClient[] => {
+  return clients.filter(client => !client.is_wired);
+};
+
+// Custom type extensions
+interface NetworkStats {
+  deviceCount: number;
+  clientCount: number;
+  averageSignal?: number;
+}
+
+const calculateStats = async (unifi: UniFiAPI): Promise<NetworkStats> => {
+  const [devices, clients] = await Promise.all([
+    unifi.getDevices(),
+    unifi.getClients()
+  ]);
+  
+  const wirelessClients = clients.filter(c => !c.is_wired && c.rssi);
+  const averageSignal = wirelessClients.length > 0
+    ? wirelessClients.reduce((sum, c) => sum + (c.rssi || 0), 0) / wirelessClients.length
+    : undefined;
+  
+  return {
+    deviceCount: devices.length,
+    clientCount: clients.length,
+    averageSignal
+  };
+};
+```
+
+### Available Interfaces
+
+- `UniFiConfig` - Configuration options
+- `UniFiDevice` - Device information and statistics
+- `UniFiClient` - Client connection details
+- `UniFiNetwork` - Network configuration
+- `UniFiSite` - Site information
+- `UniFiAlert` - System alerts
+- `UniFiSystemInfo` - System statistics
+- `UniFiError` - Custom error type with error codes
+
 ## Examples
 
-See the `examples/` directory for more detailed usage examples:
+See the `examples/` directory for comprehensive TypeScript examples:
 
-- `basic-usage.js` - Basic API usage and authentication
-- `device-management.js` - Device control and monitoring
-- `client-monitoring.js` - Client tracking and management
-- `real-time-events.js` - WebSocket event streaming with polling fallback
+- `basic-usage.ts` - Basic API usage and authentication
+- `device-management.ts` - Device control and monitoring with type safety
+- `client-monitoring.ts` - Client tracking and network analysis
+- `real-time-events.ts` - WebSocket event streaming with full typing
+- `advanced-usage.ts` - Advanced network management and monitoring
+- `basic-usage-typescript.ts` - Alternative TypeScript example
+
+All examples are written in TypeScript with full type safety and comprehensive error handling.
 - `advanced-usage.js` - Advanced network management and multi-site operations
 
 ## Error Handling

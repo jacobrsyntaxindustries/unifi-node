@@ -1,7 +1,7 @@
-const UniFiAPI = require('../src/index');
+import { UniFiAPI, UniFiConfig } from '../src/index';
 
 // Configuration - Update these values for your environment
-const config = {
+const config: UniFiConfig = {
   host: '192.168.1.1',        // Your UniFi Controller IP
   port: 8443,                 // Controller port (usually 8443)
   username: 'admin',          // Controller username
@@ -10,7 +10,7 @@ const config = {
   strictSSL: false           // Set to true in production with valid certificates
 };
 
-async function basicUsage() {
+async function basicUsage(): Promise<void> {
   const unifi = new UniFiAPI(config);
 
   try {
@@ -45,7 +45,7 @@ async function basicUsage() {
     const clients = await unifi.getClients();
     clients.forEach(client => {
       console.log(`- ${client.hostname || client.name || 'Unknown'} (${client.mac})`);
-      console.log(`  IP: ${client.ip}, Signal: ${client.rssi}dBm`);
+      console.log(`  IP: ${client.ip}, Signal: ${client.rssi || 'N/A'}dBm`);
       console.log(`  TX/RX: ${formatBytes(client.tx_bytes)}/${formatBytes(client.rx_bytes)}`);
     });
 

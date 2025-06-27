@@ -1,7 +1,7 @@
-const UniFiAPI = require('../src/index');
+import { UniFiAPI, UniFiConfig, UniFiDevice, UniFiClient } from '../src/index';
 
 // Mock configuration for testing
-const mockConfig = {
+const mockConfig: UniFiConfig = {
   host: 'test.unifi.local',
   port: 8443,
   username: 'testuser',
@@ -11,7 +11,7 @@ const mockConfig = {
 };
 
 describe('UniFiAPI', () => {
-  let unifi;
+  let unifi: UniFiAPI;
 
   beforeEach(() => {
     unifi = new UniFiAPI(mockConfig);
@@ -30,24 +30,24 @@ describe('UniFiAPI', () => {
   describe('Constructor', () => {
     test('should create instance with valid config', () => {
       expect(unifi).toBeInstanceOf(UniFiAPI);
-      expect(unifi.options.host).toBe('test.unifi.local');
-      expect(unifi.options.port).toBe(8443);
-      expect(unifi.options.username).toBe('testuser');
-      expect(unifi.options.password).toBe('testpass');
-      expect(unifi.options.site).toBe('default');
+      expect((unifi as any).options.host).toBe('test.unifi.local');
+      expect((unifi as any).options.port).toBe(8443);
+      expect((unifi as any).options.username).toBe('testuser');
+      expect((unifi as any).options.password).toBe('testpass');
+      expect((unifi as any).options.site).toBe('default');
     });
 
     test('should throw error with missing required config', () => {
       expect(() => {
-        new UniFiAPI({});
+        new UniFiAPI({} as UniFiConfig);
       }).toThrow('Host, username, and password are required');
 
       expect(() => {
-        new UniFiAPI({ host: 'test.local' });
+        new UniFiAPI({ host: 'test.local' } as UniFiConfig);
       }).toThrow('Host, username, and password are required');
 
       expect(() => {
-        new UniFiAPI({ host: 'test.local', username: 'user' });
+        new UniFiAPI({ host: 'test.local', username: 'user' } as UniFiConfig);
       }).toThrow('Host, username, and password are required');
     });
 
@@ -58,15 +58,15 @@ describe('UniFiAPI', () => {
         password: 'pass'
       });
 
-      expect(unifiMinimal.options.port).toBe(8443);
-      expect(unifiMinimal.options.site).toBe('default');
-      expect(unifiMinimal.options.ssl).toBe(true);
-      expect(unifiMinimal.options.strictSSL).toBe(false);
-      expect(unifiMinimal.options.timeout).toBe(30000);
+      expect((unifiMinimal as any).options.port).toBe(8443);
+      expect((unifiMinimal as any).options.site).toBe('default');
+      expect((unifiMinimal as any).options.ssl).toBe(true);
+      expect((unifiMinimal as any).options.strictSSL).toBe(false);
+      expect((unifiMinimal as any).options.timeout).toBe(30000);
     });
 
     test('should construct correct base URL', () => {
-      expect(unifi.baseURL).toBe('https://test.unifi.local:8443');
+      expect((unifi as any).baseURL).toBe('https://test.unifi.local:8443');
 
       const unifiHttp = new UniFiAPI({
         host: 'test.local',
@@ -74,7 +74,7 @@ describe('UniFiAPI', () => {
         password: 'pass',
         ssl: false
       });
-      expect(unifiHttp.baseURL).toBe('http://test.local:8443');
+      expect((unifiHttp as any).baseURL).toBe('http://test.local:8443');
     });
   });
 
@@ -115,18 +115,18 @@ describe('UniFiAPI', () => {
       let clientConnectedFired = false;
       let rawEventFired = false;
 
-      unifi.on('client.connected', (data) => {
+      unifi.on('client.connected', (data: any) => {
         expect(data.mac).toBe('00:11:22:33:44:55');
         expect(data.hostname).toBe('test-device');
         clientConnectedFired = true;
       });
 
-      unifi.on('raw_event', (event) => {
+      unifi.on('raw_event', (event: any) => {
         expect(event).toEqual(mockEvent);
         rawEventFired = true;
       });
 
-      unifi._handleEvent(mockEvent);
+      (unifi as any).handleEvent(mockEvent);
 
       expect(clientConnectedFired).toBe(true);
       expect(rawEventFired).toBe(true);
@@ -141,15 +141,15 @@ describe('UniFiAPI', () => {
         { meta: { message: 'custom:event' }, data: { custom: 'data' } }
       ];
 
-      const firedEvents = [];
+      const firedEvents: string[] = [];
 
       unifi.on('client.connected', () => firedEvents.push('client.connected'));
       unifi.on('client.disconnected', () => firedEvents.push('client.disconnected'));
       unifi.on('device.detected', () => firedEvents.push('device.detected'));
       unifi.on('device.lost', () => firedEvents.push('device.lost'));
-      unifi.on('event', (event) => firedEvents.push(`event:${event.type}`));
+      unifi.on('event', (event: any) => firedEvents.push(`event:${event.type}`));
 
-      events.forEach(event => unifi._handleEvent(event));
+      events.forEach(event => (unifi as any).handleEvent(event));
 
       expect(firedEvents).toContain('client.connected');
       expect(firedEvents).toContain('client.disconnected');
@@ -170,7 +170,7 @@ describe('UniFiAPI', () => {
 
       // Should not throw errors
       malformedEvents.forEach(event => {
-        expect(() => unifi._handleEvent(event)).not.toThrow();
+        expect(() => (unifi as any).handleEvent(event)).not.toThrow();
       });
     });
   });
@@ -178,7 +178,6 @@ describe('UniFiAPI', () => {
   describe('Configuration Validation', () => {
     test('should validate port numbers', () => {
       const validPorts = [80, 443, 8080, 8443, 65535];
-      const invalidPorts = [-1, 0, 65536, 'invalid', null];
 
       validPorts.forEach(port => {
         expect(() => {
@@ -197,7 +196,7 @@ describe('UniFiAPI', () => {
         password: 'pass',
         ssl: true
       });
-      expect(sslTrue.baseURL).toBe('https://test.local:8443');
+      expect((sslTrue as any).baseURL).toBe('https://test.local:8443');
 
       const sslFalse = new UniFiAPI({
         host: 'test.local',
@@ -205,26 +204,26 @@ describe('UniFiAPI', () => {
         password: 'pass',
         ssl: false
       });
-      expect(sslFalse.baseURL).toBe('http://test.local:8443');
+      expect((sslFalse as any).baseURL).toBe('http://test.local:8443');
     });
   });
 
   describe('State Management', () => {
     test('should initialize with correct default state', () => {
       expect(unifi.isAuthenticated).toBe(false);
-      expect(unifi.cookies).toBe('');
-      expect(unifi.csrfToken).toBe('');
-      expect(unifi.eventSocket).toBe(null);
+      expect((unifi as any).cookies).toBe('');
+      expect((unifi as any).csrfToken).toBe('');
+      expect((unifi as any).eventSocket).toBe(null);
     });
 
     test('should update authentication state', () => {
       unifi.isAuthenticated = true;
-      unifi.cookies = 'test-cookie';
-      unifi.csrfToken = 'test-token';
+      (unifi as any).cookies = 'test-cookie';
+      (unifi as any).csrfToken = 'test-token';
 
       expect(unifi.isAuthenticated).toBe(true);
-      expect(unifi.cookies).toBe('test-cookie');
-      expect(unifi.csrfToken).toBe('test-token');
+      expect((unifi as any).cookies).toBe('test-cookie');
+      expect((unifi as any).csrfToken).toBe('test-token');
     });
   });
 
@@ -235,11 +234,60 @@ describe('UniFiAPI', () => {
       expect(true).toBe(true); // Placeholder
     });
   });
+
+  describe('Type Safety', () => {
+    test('should have proper TypeScript types', () => {
+      // These tests verify that TypeScript compilation succeeds with proper types
+      const config: UniFiConfig = {
+        host: 'test.local',
+        username: 'user',
+        password: 'pass'
+      };
+
+      const api = new UniFiAPI(config);
+      expect(api).toBeInstanceOf(UniFiAPI);
+
+      // Type assertions to verify interface compliance
+      const mockDevice: UniFiDevice = {
+        _id: 'test-id',
+        mac: '00:11:22:33:44:55',
+        name: 'Test Device',
+        model: 'UAP-AC-LITE',
+        type: 'uap',
+        state: 1,
+        ip: '192.168.1.100',
+        adopted: true,
+        site_id: 'test-site'
+      };
+
+      const mockClient: UniFiClient = {
+        _id: 'test-client-id',
+        mac: '00:aa:bb:cc:dd:ee',
+        ip: '192.168.1.50',
+        hostname: 'test-client',
+        is_wired: false,
+        is_guest: false,
+        first_seen: Date.now() / 1000,
+        last_seen: Date.now() / 1000,
+        uptime: 3600,
+        rx_bytes: 1024,
+        rx_packets: 10,
+        tx_bytes: 512,
+        tx_packets: 5,
+        authorized: true,
+        blocked: false
+      };
+
+      expect(mockDevice.mac).toBe('00:11:22:33:44:55');
+      expect(mockClient.ip).toBe('192.168.1.50');
+    });
+  });
 });
 
 // Mock data for testing
-const mockDevices = [
+export const mockDevices: UniFiDevice[] = [
   {
+    _id: 'device-1',
     mac: '00:11:22:33:44:55',
     name: 'Test AP',
     model: 'UAP-AC-LITE',
@@ -248,9 +296,11 @@ const mockDevices = [
     ip: '192.168.1.100',
     version: '4.3.20.11298',
     uptime: 86400,
-    adopted: true
+    adopted: true,
+    site_id: 'test-site'
   },
   {
+    _id: 'device-2',
     mac: '00:11:22:33:44:66',
     name: 'Test Switch',
     model: 'US-8-60W',
@@ -259,12 +309,14 @@ const mockDevices = [
     ip: '192.168.1.101',
     version: '4.3.17.11279',
     uptime: 172800,
-    adopted: true
+    adopted: true,
+    site_id: 'test-site'
   }
 ];
 
-const mockClients = [
+export const mockClients: UniFiClient[] = [
   {
+    _id: 'client-1',
     mac: '00:aa:bb:cc:dd:ee',
     hostname: 'test-laptop',
     name: 'Test Laptop',
@@ -273,13 +325,18 @@ const mockClients = [
     is_guest: false,
     rssi: -45,
     rx_bytes: 1024000,
+    rx_packets: 1000,
     tx_bytes: 512000,
+    tx_packets: 500,
     uptime: 3600,
     first_seen: Math.floor(Date.now() / 1000) - 86400,
     last_seen: Math.floor(Date.now() / 1000),
-    satisfaction: 98
+    satisfaction: 98,
+    authorized: true,
+    blocked: false
   },
   {
+    _id: 'client-2',
     mac: '00:aa:bb:cc:dd:ff',
     hostname: 'test-phone',
     name: 'Test Phone',
@@ -288,17 +345,16 @@ const mockClients = [
     is_guest: false,
     rssi: -52,
     rx_bytes: 2048000,
+    rx_packets: 2000,
     tx_bytes: 1024000,
+    tx_packets: 1000,
     uptime: 7200,
     first_seen: Math.floor(Date.now() / 1000) - 172800,
     last_seen: Math.floor(Date.now() / 1000),
-    satisfaction: 95
+    satisfaction: 95,
+    authorized: true,
+    blocked: false
   }
 ];
 
-// Export mock data for use in integration tests
-module.exports = {
-  mockConfig,
-  mockDevices,
-  mockClients
-};
+export { mockConfig };

@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2025-06-27
+
+### 💥 Breaking Changes
+- **Complete TypeScript rewrite**: Project is now TypeScript-first with full type safety
+- **Modern ES2020+ features**: Updated target and module system
+- **Enhanced type definitions**: All UniFi data structures now have comprehensive interfaces
+
+### Added
+- **Full TypeScript support** with comprehensive type definitions
+- **Type-safe interfaces** for all UniFi data structures (devices, clients, networks, alerts)
+- **Modern TypeScript toolchain** with ts-jest, typedoc, and TypeScript ESLint
+- **Enhanced IntelliSense support** with complete autocomplete and error checking
+- **Improved build system** with TypeScript compilation and declaration files
+- **TypeScript examples** for all major functionality
+- **Better error handling** with typed error objects
+
+### Changed
+- **All source code migrated to TypeScript** (`src/index.ts`)
+- **All example files converted to TypeScript** (`.ts` extensions)
+- **Test suite updated** for TypeScript compatibility
+- **Documentation updated** to emphasize TypeScript-first approach
+- **Build process modernized** with TypeScript compiler
+
+### Technical Improvements
+- **Strict TypeScript configuration** with comprehensive compiler options
+- **Enhanced type safety** with strict null checks and function types
+- **Modern module system** with ES2020 target
+- **Improved developer experience** with full IntelliSense support
+
 ## [1.0.0] - 2025-06-26
 
 ### Added
