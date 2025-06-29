@@ -270,6 +270,7 @@ export class UniFiAPI extends EventEmitter {
   private csrfToken: string = '';
   private client: AxiosInstance;
   private eventSocket: WebSocket | null = null;
+  private controllerType: 'classic' | 'unifi-os' | null = null;
 
   public isAuthenticated: boolean = false;
 
@@ -355,29 +356,69 @@ export class UniFiAPI extends EventEmitter {
    */
   public async login(): Promise<boolean> {
     try {
-      const response = await this.client.post<UniFiResponse>('/api/login', {
-        username: this.options.username,
-        password: this.options.password,
-        remember: false
-      });
-
-      if (response.data && response.data.meta && response.data.meta.rc === 'ok') {
-        this.isAuthenticated = true;
-
-        // Extract CSRF token if available
-        if (response.data.meta.csrf_token) {
-          this.csrfToken = response.data.meta.csrf_token;
+      // First, try to detect the controller type
+      this.controllerType = await this.detectControllerType();
+      
+      let response: AxiosResponse<any>;
+      
+      if (this.controllerType === 'unifi-os') {
+        // Use UniFi OS authentication
+        response = await this.client.post('/api/auth/login', {
+          username: this.options.username,
+          password: this.options.password
+        });
+        
+        // For UniFi OS, check if we got user data back
+        if (response.status === 200 && response.data && response.data.username) {
+          this.isAuthenticated = true;
+          this.emit('authenticated');
+          return true;
+        } else {
+          throw new UniFiError('UniFi OS authentication failed: Invalid response');
         }
-
-        this.emit('authenticated');
-        return true;
       } else {
-        throw new UniFiError('Authentication failed: Invalid response');
+        // Use classic UniFi Controller authentication
+        response = await this.client.post<UniFiResponse>('/api/login', {
+          username: this.options.username,
+          password: this.options.password,
+          remember: false
+        });
+
+        if (response.data && response.data.meta && response.data.meta.rc === 'ok') {
+          this.isAuthenticated = true;
+
+          // Extract CSRF token if available
+          if (response.data.meta.csrf_token) {
+            this.csrfToken = response.data.meta.csrf_token;
+          }
+
+          this.emit('authenticated');
+          return true;
+        } else {
+          throw new UniFiError('Authentication failed: Invalid response');
+        }
       }
     } catch (error) {
       this.isAuthenticated = false;
       throw error;
     }
+  }
+
+  /**
+   * Detect the type of UniFi Controller
+   */
+  private async detectControllerType(): Promise<'classic' | 'unifi-os'> {
+    try {
+      // Check for UniFi OS by testing the /api/system endpoint
+      const systemResponse = await this.client.get('/api/system');
+      if (systemResponse.status === 200) {
+        return 'unifi-os';
+      }
+    } catch (error) {
+      // If /api/system fails, it's likely a classic controller
+    }
+    
+    return 'classic';
   }
 
   /**
@@ -423,9 +464,12 @@ export class UniFiAPI extends EventEmitter {
   ): Promise<T> {
     await this.ensureAuthenticated();
 
+    // Build the correct endpoint for the controller type
+    const finalEndpoint = this.buildApiEndpoint(endpoint);
+
     const config: any = {
       method: method.toLowerCase(),
-      url: endpoint
+      url: finalEndpoint
     };
 
     if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
@@ -434,10 +478,17 @@ export class UniFiAPI extends EventEmitter {
 
     const response = await this.client(config);
 
-    if (response.data && response.data.meta && response.data.meta.rc === 'ok') {
-      return response.data.data || response.data;
+    // Handle different response formats for different controller types
+    if (this.controllerType === 'unifi-os') {
+      // UniFi OS may return data directly or in a different format
+      return response.data?.data || response.data;
     } else {
-      throw new UniFiError(`API Error: ${response.data?.meta?.msg || 'Unknown error'}`);
+      // Classic UniFi Controller format
+      if (response.data && response.data.meta && response.data.meta.rc === 'ok') {
+        return response.data.data || response.data;
+      } else {
+        throw new UniFiError(`API Error: ${response.data?.meta?.msg || 'Unknown error'}`);
+      }
     }
   }
 
@@ -497,7 +548,27 @@ export class UniFiAPI extends EventEmitter {
    * Get all connected clients
    */
   public async getClients(): Promise<UniFiClient[]> {
-    return this.request<UniFiClient[]>(`/api/s/${this.options.site}/stat/sta`);
+    // UniFi OS uses a different endpoint that includes IP addresses
+    const endpoint = this.controllerType === 'unifi-os' 
+      ? `/api/s/${this.options.site}/stat/alluser`
+      : `/api/s/${this.options.site}/stat/sta`;
+    
+    const clients = await this.request<UniFiClient[]>(endpoint);
+    
+    // For UniFi OS, map the response to match the expected interface
+    if (this.controllerType === 'unifi-os') {
+      return clients.map((client: any) => ({
+        ...client,
+        ip: client.last_ip || client.ip || undefined, // Use last_ip if available, fallback to undefined
+        name: client.hostname || client.name || undefined,
+        hostname: client.hostname || client.name || undefined,
+        // Map other fields as needed
+        authorized: !client.blocked,
+        blocked: client.blocked || false
+      }));
+    }
+    
+    return clients;
   }
 
   /**
@@ -607,7 +678,14 @@ export class UniFiAPI extends EventEmitter {
       return true; // Already connected
     }
 
-    const wsUrl = `${this.baseURL.replace('http', 'ws')}/wss/s/${this.options.site}/events`;
+    let wsUrl: string;
+    if (this.controllerType === 'unifi-os') {
+      // UniFi OS uses different WebSocket endpoints
+      wsUrl = `${this.baseURL.replace('http', 'ws')}/proxy/network/wss/s/${this.options.site}/events`;
+    } else {
+      // Classic UniFi Controller
+      wsUrl = `${this.baseURL.replace('http', 'ws')}/wss/s/${this.options.site}/events`;
+    }
 
     this.eventSocket = new WebSocket(wsUrl, {
       headers: {
@@ -694,14 +772,33 @@ export class UniFiAPI extends EventEmitter {
    * Get controller information
    */
   public async getControllerInfo(): Promise<UniFiControllerInfo> {
-    return this.request<UniFiControllerInfo>('/api/self');
+    if (this.controllerType === 'unifi-os') {
+      // For UniFi OS, get system information instead of user info
+      const systemInfo = await this.request<any>('/api/system');
+      return {
+        build: systemInfo.build || 'unknown',
+        version: systemInfo.version || 'unknown', 
+        uuid: systemInfo.uuid || systemInfo.unique_id || 'unknown',
+        update_available: systemInfo.update_available || false,
+        update_downloaded: systemInfo.update_downloaded || false
+      };
+    } else {
+      // For classic UniFi Controller
+      return this.request<UniFiControllerInfo>('/api/self');
+    }
   }
 
   /**
    * Get site information
    */
   public async getSites(): Promise<UniFiSite[]> {
-    return this.request<UniFiSite[]>('/api/self/sites');
+    if (this.controllerType === 'unifi-os') {
+      // For UniFi OS, sites are accessed differently
+      return this.request<UniFiSite[]>('/proxy/network/api/self/sites');
+    } else {
+      // For classic UniFi Controller
+      return this.request<UniFiSite[]>('/api/self/sites');
+    }
   }
 
   /**
@@ -720,6 +817,20 @@ export class UniFiAPI extends EventEmitter {
       _id: id
     });
     return true;
+  }
+
+  /**
+   * Build the correct API endpoint based on controller type
+   */
+  private buildApiEndpoint(path: string): string {
+    if (this.controllerType === 'unifi-os') {
+      // For UniFi OS, we need to use the proxy endpoints for network operations
+      if (path.startsWith('/api/s/')) {
+        // Convert /api/s/site/... to /proxy/network/api/s/site/...
+        return `/proxy/network${path}`;
+      }
+    }
+    return path;
   }
 }
 

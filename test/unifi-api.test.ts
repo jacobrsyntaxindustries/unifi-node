@@ -1,6 +1,6 @@
 import { UniFiAPI, UniFiConfig, UniFiDevice, UniFiClient } from '../src/index';
 
-// Mock configuration for testing
+// Mock configuration for unit testing (not real credentials)
 const mockConfig: UniFiConfig = {
   host: 'test.unifi.local',
   port: 8443,

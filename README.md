@@ -310,6 +310,37 @@ try {
 }
 ```
 
+## Testing
+
+This project includes both unit tests and integration tests.
+
+### Unit Tests (Safe - No Network Required)
+```bash
+npm test              # Run unit tests only
+npm run test:unit     # Same as above
+npm run test:watch    # Watch mode for development
+```
+
+### Integration Tests (Real Network Required)
+```bash
+# 1. Set up environment
+cp .env.example .env
+# Edit .env with your UniFi Controller details
+
+# 2. Enable and run integration tests
+RUN_INTEGRATION_TESTS=true npm run test:integration
+```
+
+### Quick Network Scan
+```bash
+# Test connectivity without full test suite
+npm run scan
+```
+
+**⚠️ Important**: Integration tests connect to real UniFi Controllers. Use only in test/development environments!
+
+See [TESTING.md](./TESTING.md) for detailed testing instructions and safety guidelines.
+
 ## Contributing
 
 1. Fork the repository
